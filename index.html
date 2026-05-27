@@ -11,22 +11,54 @@
       background: #ffffff;
       display: flex;
       justify-content: center;
-      align-items: center;
+      align-items: flex-start;
       min-height: 100vh;
       padding: 1.5rem;
     }
     .container { width: 100%; max-width: 480px; }
-    .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
-    .card { background: #f9f9f8; border: 1px solid #e5e5e3; border-radius: 14px; padding: 1.25rem; }
-    .card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
-    .flag { font-size: 24px; }
+
+    /* 환율 카드 */
+    .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+    .card { background: #f9f9f8; border: 1px solid #e5e5e3; border-radius: 14px; padding: 1.1rem; }
+    .card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+    .flag { font-size: 22px; }
     .label { font-size: 13px; color: #888; }
     .sublabel { font-size: 11px; color: #aaa; margin-top: 1px; }
-    .rate { font-size: 30px; font-weight: 600; color: #1a1a1a; letter-spacing: -0.5px; margin-bottom: 2px; }
-    .unit { font-size: 12px; color: #aaa; margin-bottom: 10px; }
-    .change { font-size: 12px; color: #aaa; display: flex; align-items: center; gap: 4px; }
+    .rate { font-size: 26px; font-weight: 600; color: #1a1a1a; letter-spacing: -0.5px; margin-bottom: 2px; }
+    .unit { font-size: 12px; color: #aaa; margin-bottom: 8px; }
+    .change { font-size: 12px; color: #aaa; }
     .change.up { color: #e05140; }
     .change.down { color: #0f8060; }
+
+    /* 계산기 */
+    .calc { background: #f9f9f8; border: 1px solid #e5e5e3; border-radius: 14px; padding: 1.1rem; margin-bottom: 12px; }
+    .calc-title { font-size: 13px; color: #888; margin-bottom: 12px; }
+    .calc-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+    .tab {
+      flex: 1; padding: 7px; font-size: 13px; font-weight: 500;
+      border: 1px solid #e5e5e3; border-radius: 8px;
+      background: #fff; color: #aaa; cursor: pointer; transition: all 0.15s;
+    }
+    .tab.active { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+    .calc-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .calc-row label { font-size: 13px; color: #888; min-width: 38px; }
+    .calc-row input {
+      flex: 1; padding: 9px 12px; font-size: 15px; font-weight: 500;
+      border: 1px solid #e0e0de; border-radius: 9px;
+      background: #fff; color: #1a1a1a; outline: none;
+      transition: border 0.15s;
+    }
+    .calc-row input:focus { border-color: #1a1a1a; }
+    .calc-row .currency { font-size: 12px; color: #aaa; min-width: 30px; }
+    .calc-arrow { text-align: center; color: #ccc; font-size: 18px; margin: 4px 0; }
+    .calc-result {
+      background: #fff; border: 1px solid #e5e5e3; border-radius: 9px;
+      padding: 10px 12px; display: flex; align-items: baseline; justify-content: space-between;
+    }
+    .calc-result .result-num { font-size: 22px; font-weight: 600; color: #1a1a1a; }
+    .calc-result .result-unit { font-size: 12px; color: #aaa; }
+
+    /* 하단 */
     .footer { display: flex; align-items: center; justify-content: space-between; }
     .updated { font-size: 11px; color: #bbb; }
     .refresh-btn {
@@ -41,6 +73,8 @@
 </head>
 <body>
   <div class="container">
+
+    <!-- 환율 카드 -->
     <div class="cards">
       <div class="card">
         <div class="card-header">
@@ -67,6 +101,30 @@
         <div class="change" id="jpy-change">불러오는 중...</div>
       </div>
     </div>
+
+    <!-- 계산기 -->
+    <div class="calc">
+      <div class="calc-title">환율 계산기</div>
+      <div class="calc-tabs">
+        <button class="tab active" onclick="setTab('usd')">🇺🇸 달러 ↔ 원</button>
+        <button class="tab" onclick="setTab('jpy')">🇯🇵 엔 ↔ 원</button>
+      </div>
+
+      <div id="calc-body">
+        <div class="calc-row">
+          <label id="from-label">달러</label>
+          <input type="number" id="from-input" placeholder="0" oninput="calcFrom()" />
+          <span class="currency" id="from-currency">USD</span>
+        </div>
+        <div class="calc-arrow">↕</div>
+        <div class="calc-row">
+          <label id="to-label">원</label>
+          <input type="number" id="to-input" placeholder="0" oninput="calcTo()" />
+          <span class="currency" id="to-currency">KRW</span>
+        </div>
+      </div>
+    </div>
+
     <div class="footer">
       <span class="updated" id="last-updated"></span>
       <button class="refresh-btn" onclick="fetchRates()">↻ 새로고침</button>
@@ -74,6 +132,45 @@
   </div>
 
   <script>
+    let rates = { usd: 0, jpy: 0 };
+    let currentTab = 'usd';
+
+    function setTab(tab) {
+      currentTab = tab;
+      document.querySelectorAll('.tab').forEach((t, i) => {
+        t.classList.toggle('active', (i === 0 && tab === 'usd') || (i === 1 && tab === 'jpy'));
+      });
+      if (tab === 'usd') {
+        document.getElementById('from-label').textContent = '달러';
+        document.getElementById('from-currency').textContent = 'USD';
+        document.getElementById('to-label').textContent = '원';
+        document.getElementById('to-currency').textContent = 'KRW';
+      } else {
+        document.getElementById('from-label').textContent = '엔';
+        document.getElementById('from-currency').textContent = 'JPY';
+        document.getElementById('to-label').textContent = '원';
+        document.getElementById('to-currency').textContent = 'KRW';
+      }
+      document.getElementById('from-input').value = '';
+      document.getElementById('to-input').value = '';
+    }
+
+    function calcFrom() {
+      const val = parseFloat(document.getElementById('from-input').value);
+      if (isNaN(val) || val === '') { document.getElementById('to-input').value = ''; return; }
+      const rate = currentTab === 'usd' ? rates.usd : rates.jpy / 100;
+      document.getElementById('to-input').value = Math.round(val * rate).toLocaleString('ko-KR');
+    }
+
+    function calcTo() {
+      const raw = document.getElementById('to-input').value.replace(/,/g, '');
+      const val = parseFloat(raw);
+      if (isNaN(val)) { document.getElementById('from-input').value = ''; return; }
+      const rate = currentTab === 'usd' ? rates.usd : rates.jpy / 100;
+      if (rate === 0) return;
+      document.getElementById('from-input').value = (val / rate).toFixed(2);
+    }
+
     async function fetchRates() {
       document.getElementById('usd-rate').textContent = '...';
       document.getElementById('jpy-rate').textContent = '...';
@@ -83,15 +180,14 @@
       document.getElementById('jpy-change').className = 'change';
 
       try {
-        const [todayRes, prevRes] = await Promise.all([
-          fetch('https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json'),
-          fetch('https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.min.json')
-        ]);
-        const today = await todayRes.json();
+        const res = await fetch('https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json');
+        const today = await res.json();
 
         const usdToKrw = today.usd.krw;
-        const jpyToKrw = today.usd.krw / today.usd.jpy;
-        const jpyRate = jpyToKrw * 100;
+        const jpyRate = (today.usd.krw / today.usd.jpy) * 100;
+
+        rates.usd = usdToKrw;
+        rates.jpy = jpyRate;
 
         document.getElementById('usd-rate').textContent = Math.round(usdToKrw).toLocaleString('ko-KR');
         document.getElementById('jpy-rate').textContent = Math.round(jpyRate).toLocaleString('ko-KR');
@@ -100,9 +196,8 @@
           const yesterday = new Date();
           yesterday.setDate(yesterday.getDate() - 1);
           const yStr = yesterday.toISOString().split('T')[0];
-          const prevRes2 = await fetch(`https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@${yStr}/v1/currencies/usd.json`);
-          const prev = await prevRes2.json();
-
+          const prevRes = await fetch(`https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@${yStr}/v1/currencies/usd.json`);
+          const prev = await prevRes.json();
           const prevUsd = prev.usd.krw;
           const prevJpy = (prev.usd.krw / prev.usd.jpy) * 100;
 
@@ -113,7 +208,6 @@
             el.textContent = `${arrow} ${sign}${Math.abs(diff).toFixed(1)}원 (전일 대비)`;
             el.className = 'change ' + (diff >= 0 ? 'up' : 'down');
           }
-
           setChange('usd-change', usdToKrw - prevUsd);
           setChange('jpy-change', jpyRate - prevJpy);
         } catch(e) {
@@ -122,15 +216,13 @@
         }
 
         const now = new Date();
-        document.getElementById('last-updated').textContent =
-          '업데이트: ' + now.toLocaleString('ko-KR');
+        document.getElementById('last-updated').textContent = '업데이트: ' + now.toLocaleString('ko-KR');
 
       } catch(err) {
         document.getElementById('usd-rate').textContent = '오류';
         document.getElementById('jpy-rate').textContent = '오류';
         document.getElementById('usd-change').textContent = '네트워크 오류';
         document.getElementById('jpy-change').textContent = '';
-        console.error(err);
       }
     }
 
