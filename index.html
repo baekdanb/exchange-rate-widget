@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>환율 위젯</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #ffffff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 1.5rem;
+    }
+    .container { width: 100%; max-width: 480px; }
+    .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+    .card { background: #f9f9f8; border: 1px solid #e5e5e3; border-radius: 14px; padding: 1.25rem; }
+    .card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+    .flag { font-size: 24px; }
+    .label { font-size: 13px; color: #888; }
+    .sublabel { font-size: 11px; color: #aaa; margin-top: 1px; }
+    .rate { font-size: 30px; font-weight: 600; color: #1a1a1a; letter-spacing: -0.5px; margin-bottom: 2px; }
+    .unit { font-size: 12px; color: #aaa; margin-bottom: 10px; }
+    .change { font-size: 12px; color: #aaa; display: flex; align-items: center; gap: 4px; }
+    .change.up { color: #e05140; }
+    .change.down { color: #0f8060; }
+    .footer { display: flex; align-items: center; justify-content: space-between; }
+    .updated { font-size: 11px; color: #bbb; }
+    .refresh-btn {
+      font-size: 12px; color: #666; background: none;
+      border: 1px solid #ddd; border-radius: 8px;
+      padding: 5px 12px; cursor: pointer;
+      display: flex; align-items: center; gap: 5px;
+      transition: background 0.15s;
+    }
+    .refresh-btn:hover { background: #f0f0f0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="cards">
+      <div class="card">
+        <div class="card-header">
+          <span class="flag">🇺🇸</span>
+          <div>
+            <div class="label">미국 달러</div>
+            <div class="sublabel">USD → KRW</div>
+          </div>
+        </div>
+        <div class="rate" id="usd-rate">—</div>
+        <div class="unit">원 / 1달러</div>
+        <div class="change" id="usd-change">불러오는 중...</div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <span class="flag">🇯🇵</span>
+          <div>
+            <div class="label">일본 엔</div>
+            <div class="sublabel">JPY → KRW</div>
+          </div>
+        </div>
+        <div class="rate" id="jpy-rate">—</div>
+        <div class="unit">원 / 100엔</div>
+        <div class="change" id="jpy-change">불러오는 중...</div>
+      </div>
+    </div>
+    <div class="footer">
+      <span class="updated" id="last-updated"></span>
+      <button class="refresh-btn" onclick="fetchRates()">↻ 새로고침</button>
+    </div>
+  </div>
+
+  <script>
+    async function fetchRates() {
+      document.getElementById('usd-rate').textContent = '...';
+      document.getElementById('jpy-rate').textContent = '...';
+      document.getElementById('usd-change').textContent = '불러오는 중...';
+      document.getElementById('usd-change').className = 'change';
+      document.getElementById('jpy-change').textContent = '불러오는 중...';
+      document.getElementById('jpy-change').className = 'change';
+
+      try {
+        const [todayRes, prevRes] = await Promise.all([
+          fetch('https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json'),
+          fetch('https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.min.json')
+        ]);
+        const today = await todayRes.json();
+
+        const usdToKrw = today.usd.krw;
+        const jpyToKrw = today.usd.krw / today.usd.jpy;
+        const jpyRate = jpyToKrw * 100;
+
+        document.getElementById('usd-rate').textContent = Math.round(usdToKrw).toLocaleString('ko-KR');
+        document.getElementById('jpy-rate').textContent = Math.round(jpyRate).toLocaleString('ko-KR');
+
+        try {
+          const yesterday = new Date();
+          yesterday.setDate(yesterday.getDate() - 1);
+          const yStr = yesterday.toISOString().split('T')[0];
+          const prevRes2 = await fetch(`https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@${yStr}/v1/currencies/usd.json`);
+          const prev = await prevRes2.json();
+
+          const prevUsd = prev.usd.krw;
+          const prevJpy = (prev.usd.krw / prev.usd.jpy) * 100;
+
+          function setChange(id, diff) {
+            const el = document.getElementById(id);
+            const sign = diff >= 0 ? '+' : '';
+            const arrow = diff >= 0 ? '▲' : '▼';
+            el.textContent = `${arrow} ${sign}${Math.abs(diff).toFixed(1)}원 (전일 대비)`;
+            el.className = 'change ' + (diff >= 0 ? 'up' : 'down');
+          }
+
+          setChange('usd-change', usdToKrw - prevUsd);
+          setChange('jpy-change', jpyRate - prevJpy);
+        } catch(e) {
+          document.getElementById('usd-change').textContent = '';
+          document.getElementById('jpy-change').textContent = '';
+        }
+
+        const now = new Date();
+        document.getElementById('last-updated').textContent =
+          '업데이트: ' + now.toLocaleString('ko-KR');
+
+      } catch(err) {
+        document.getElementById('usd-rate').textContent = '오류';
+        document.getElementById('jpy-rate').textContent = '오류';
+        document.getElementById('usd-change').textContent = '네트워크 오류';
+        document.getElementById('jpy-change').textContent = '';
+        console.error(err);
+      }
+    }
+
+    fetchRates();
+  </script>
+</body>
+</html>
